@@ -292,7 +292,7 @@ setInterval(function ( ) {
       </div>
       <div class="card humidity">
         <h4><i class="fas fa-tint"></i> HUMIDITY</h4>
-        <p class="condition">standard:50</p>
+        <p class="condition">standard:60</p>
         <p><span class="reading"><span id="hum">%HUMIDITY%</span> &percnt;</span></p>
       </div>
       <div class="card co2 ppm">
@@ -302,7 +302,7 @@ setInterval(function ( ) {
       </div>
       <div class="card microdust">
         <h4><i class="fas fa-lungs"></i> GP2Y</h4>
-        <p class="condition">standard:80ug/m^3</p>
+        <p class="condition">standard:50ug/m^3</p>
         <p><span class="reading"><span id="microdust">%microdust_GP2Y%</span> ug/m^3</span></p>
       </div>
       <div class="card pm10">
@@ -388,6 +388,37 @@ String outputState(){
     return "";
   }
   return "";
+}
+
+void purifier_control() {
+  // 내부 미세먼지 농도가 80이 넘거나,
+  // 외부 미세먼지 농도가 800이 넘거나,
+  // 이산화탄소 농도가 550이 넘으면 가동
+  if(microdust_GP2Y > 80 || microdust_pm10 > 80 || co2gas > 550)
+  {
+    esp_send.x = 1;
+    Serial.println("Purifier ON");
+  } else {
+    esp_send.x = 0;
+    Serial.println("Purifier OFF");
+  }
+}
+
+void ventilator_control() {
+  // 외부 미세먼지 농도가 80 이하일 경우 가동
+  // 또는 가동온도가 26도보다 높은 경우,
+  // 또는 내부 미세먼지보다 외부의 미세먼지가 더 좋은 경우,
+  // 또는 이산화탄소의 농도가 600이 넘는 경우,
+  // 또는 실내 습도가 70을 넘어가는 경우 가동 
+  if(microdust_pm10 <= 80)
+  {
+    if(microdust_GP2Y < microdust_pm10 || temperature > 26 || co2gas > 600 || humidity > 60)
+    esp_send.y = 1;
+    Serial.println("Ventilator ON");
+  } else {
+    esp_send.y = 0;
+    Serial.println("Ventilator OFF");
+  }
 }
 
 void setup() {
@@ -477,8 +508,10 @@ void setup() {
 
 void loop() {
   if ((millis() - lastTime) > timerDelay) {
-    esp_send.x = ledState;
-    esp_send.y = ledState;
+    //esp_send.x = ledState;
+    //esp_send.y = ledState;
+    purifier_control();
+    ventilator_control();
 
     esp_err_t result = esp_now_send(0, (uint8_t *) &esp_send, sizeof(esp_struct));
     if (result == ESP_OK) {
